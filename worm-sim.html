@@ -1,746 +1,572 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Worm Care Simulator</title>
-<style>
-  :root{
-    --bg:#0f1724;
-    --panel:#0b1220;
-    --accent:#6ee7b7;
-    --muted:#9aa4b2;
-    --danger:#ff6b6b;
-    --glass: rgba(255,255,255,0.04);
-    --glass-2: rgba(255,255,255,0.02);
-  }
-  html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;}
-  body{
-    background: linear-gradient(180deg,#071226 0%, #041027 100%);
-    color:#e6eef6;
-    display:flex;
-    align-items:stretch;
-    gap:18px;
-    padding:18px;
-    box-sizing:border-box;
-  }
-
-  /* Left: canvas area */
-  .game-wrap{
-    flex:1 1 0;
-    min-width:300px;
-    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
-    border-radius:12px;
-    padding:12px;
-    display:flex;
-    flex-direction:column;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
-    position:relative;
-    overflow:hidden;
-  }
-
-  canvas{width:100%; height:100%; display:block; border-radius:8px; background:
-    radial-gradient(1200px 600px at 10% 10%, rgba(110,231,183,0.03), transparent),
-    linear-gradient(180deg, rgba(6,18,30,1), rgba(3,7,14,1));
-    cursor: none;
-  }
-
-  .hud{
-    position:absolute;
-    left:16px;
-    top:16px;
-    display:flex;
-    gap:10px;
-    align-items:center;
-    z-index:10;
-  }
-  .stat{
-    background:var(--glass);
-    padding:8px 10px;
-    border-radius:10px;
-    min-width:160px;
-    box-shadow: inset 0 -2px 6px rgba(0,0,0,0.35);
-  }
-  .stat h4{font-size:12px;margin:0 0 6px 0;color:var(--muted);}
-  .bar{
-    height:10px;
-    background:var(--glass-2);
-    border-radius:6px;
-    overflow:hidden;
-  }
-  .bar > i{
-    display:block;height:100%;width:50%;background:linear-gradient(90deg,var(--accent),#33d28a);
-    border-radius:6px;
-    transition:width 300ms linear;
-  }
-  .small{
-    font-size:12px;color:var(--muted);
-  }
-
-  /* Right side control panel */
-  .panel{
-    width:320px;
-    max-width:42%;
-    min-width:260px;
-    background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
-    border-radius:12px;
-    padding:14px;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
-    display:flex;
-    flex-direction:column;
-    gap:12px;
-    color:#dcecf0;
-  }
-  .panel h2{margin:0;font-size:18px;letter-spacing:0.2px;}
-  .row{display:flex;gap:8px;align-items:center;}
-  button{
-    appearance:none;
-    border:0;
-    padding:10px 12px;
-    border-radius:10px;
-    background:linear-gradient(180deg,#13313b,#0f2a33);
-    color:#e7fbf0;font-weight:600;
-    cursor:pointer;
-    box-shadow: 0 6px 14px rgba(5,10,15,0.5);
-  }
-  button:active{transform:translateY(1px) scale(0.997);}
-  .muted{color:var(--muted);font-size:13px}
-
-  .big-btn{
-    padding:12px 16px;
-    font-size:14px;
-    flex:1;
-  }
-
-  .controls{display:flex;gap:8px;}
-  .stats-list{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .card{background:var(--glass);padding:10px;border-radius:10px;}
-  .log{background:rgba(255,255,255,0.02);padding:8px;border-radius:8px;height:120px;overflow:auto;font-size:13px;color:var(--muted)}
-
-  footer.small{font-size:12px;color:var(--muted);padding-top:6px}
-
-  /* tiny responsive */
-  @media (max-width:900px){
-    body{flex-direction:column;padding:12px;}
-    .panel{width:100%;max-width:100%;}
-  }
-</style>
+  <meta charset="utf-8" />
+  <title>ToonyTime Platformer — Demo</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    html,body { height:100%; margin:0; background:#0b1020; color:#eaeef6; font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;}
+    #gameContainer { width:100%; height:100vh; display:flex; align-items:center; justify-content:center; }
+    canvas { image-rendering: pixelated; }
+    .note {
+      position:fixed; left:12px; bottom:10px; font-size:13px; opacity:.8;
+      background:linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
+      padding:6px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.03);
+      backdrop-filter: blur(4px);
+    }
+  </style>
+  <!-- Phaser CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
 </head>
 <body>
-  <div class="game-wrap" id="gameWrap">
-    <div class="hud" aria-hidden="true">
-      <div class="stat" title="Hunger (0 full - 100 starving)">
-        <h4>Hunger</h4>
-        <div class="bar"><i id="hungerBar"></i></div>
-      </div>
-      <div class="stat" title="Energy (sleep recovers energy)">
-        <h4>Energy</h4>
-        <div class="bar"><i id="energyBar"></i></div>
-      </div>
-      <div class="stat" title="Health">
-        <h4>Health</h4>
-        <div class="bar"><i id="healthBar"></i></div>
-      </div>
-    </div>
-
-    <canvas id="c"></canvas>
-  </div>
-
-  <div class="panel" id="panel">
-    <h2>Worm Care Simulator</h2>
-    <p class="muted">Take care of your pet worm — feed it, protect it from birds, and keep it happy. It follows your mouse or finger. Stats save automatically.</p>
-
-    <div class="controls">
-      <button id="feedBtn" class="big-btn">Feed 🍎 <span id="feedCd" class="small muted"></span></button>
-      <button id="shelterBtn" class="big-btn">Shelter 🛡️ <span id="shelterCd" class="small muted"></span></button>
-    </div>
-
-    <div class="row">
-      <div class="card" style="flex:1">
-        <div class="small muted">Food stock</div>
-        <div style="font-weight:700;font-size:20px" id="foodStock">3</div>
-        <div class="small muted">Plant food (auto grows every 60s)</div>
-      </div>
-      <div class="card">
-        <div class="small muted">Worm mood</div>
-        <div id="mood" style="font-weight:700;font-size:18px">Content</div>
-      </div>
-    </div>
-
-    <div class="stats-list">
-      <div class="card"><div class="small muted">Hunger: <span id="hungerText">50</span></div></div>
-      <div class="card"><div class="small muted">Energy: <span id="energyText">50</span></div></div>
-      <div class="card"><div class="small muted">Happiness: <span id="happyText">50</span></div></div>
-      <div class="card"><div class="small muted">Health: <span id="healthText">100</span></div></div>
-    </div>
-
-    <div>
-      <div class="small muted">Action log</div>
-      <div class="log" id="log"></div>
-    </div>
-
-    <div class="row">
-      <button id="resetBtn">Reset Save</button>
-      <div style="flex:1" class="small muted">Autosaves to localStorage (browser)</div>
-    </div>
-
-    <footer class="small">Tip: Click birds to scare them. On mobile: tap to set the worm's target.</footer>
-  </div>
+  <div id="gameContainer"></div>
+  <div class="note">Arrows / WASD to move, Z to jump, X to dash, M mute</div>
 
 <script>
-/*
-  Worm Care Simulator
-  - Single file demo with canvas rendering + game logic
-  - LocalStorage save under key 'wormSim_save_v1'
-  - Easy to extend: edit constants below
-*/
+/* ============================================================
+   ToonyTime Platformer Demo (Phaser 3)
+   Single-file HTML. Save as index.html and open in a browser.
+   ============================================================ */
 
-(() => {
-  // ====== Config ======
-  const SAVE_KEY = 'wormSim_save_v1';
-  const SEGMENTS = 14; // number of worm segments
-  const SEG_LEN = 14; // distance between segments
-  const WORM_BASE_SIZE = 12; // head radius
-  const TICK_MS = 1000/60;
-  const BIRD_SPAWN_INTERVAL = 8000; // ms
-  const FOOD_GROW_INTERVAL = 60000; // ms
-  const FEED_COOLDOWN = 8000;
-  const SHELTER_DURATION = 10000;
-  const SHELTER_COOLDOWN = 20000;
-  const SAVE_INTERVAL = 3000;
+const GAME_WIDTH = 960;
+const GAME_HEIGHT = 540;
 
-  // ====== State ======
-  const canvas = document.getElementById('c');
-  const ctx = canvas.getContext('2d', { alpha: true });
+const config = {
+  type: Phaser.AUTO,
+  parent: 'gameContainer',
+  width: GAME_WIDTH,
+  height: GAME_HEIGHT,
+  backgroundColor: '#0b1220',
+  physics: {
+    default: 'arcade',
+    arcade: {
+      gravity: { y: 1200 },
+      debug: false
+    }
+  },
+  scene: [BootScene, MenuScene, OverworldScene, LevelScene, UIScene]
+};
 
-  // responsive canvas sizing
-  function resize(){ canvas.width = canvas.clientWidth * devicePixelRatio; canvas.height = canvas.clientHeight * devicePixelRatio; ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0); }
-  window.addEventListener('resize', resize);
+/* --------------- Boot Scene (tiny loader & create runtime assets) --------------- */
+function BootScene() { Phaser.Scene.call(this, { key: 'BootScene' }); }
+BootScene.prototype = Object.create(Phaser.Scene.prototype);
+BootScene.prototype.constructor = BootScene;
+BootScene.prototype.preload = function() {
+  // load nothing — create quick-generated assets in create()
+};
+BootScene.prototype.create = function() {
+  // Generate simple sprites using graphics to avoid external assets
 
-  // user inputs
-  let pointer = { x: 400, y: 240, down:false, lastX:400, lastY:240 };
-
-  // worm physical segments
-  const segments = [];
-  for(let i=0;i<SEGMENTS;i++){
-    segments.push({ x: 200 - i*SEG_LEN, y: 200, angle:0 });
+  // Player sprite (rounded square)
+  {
+    const g = this.make.graphics({ x:0, y:0, add: false });
+    g.fillStyle(0x58a6ff, 1);
+    g.fillRoundedRect(0,0,40,48,8);
+    g.fillStyle(0x11334a, 1);
+    g.fillRect(10,30,20,6); // simple face-ish
+    g.generateTexture('player', 40,48);
+    g.destroy();
   }
 
-  // worm stats
-  let state = {
-    hunger: 60, // 0=starving, 100=well-fed
-    energy: 80, // 0 tired, 100 energetic
-    happiness: 80,
-    health: 100,
-    foodStock: 3,
-    lastFeedAt: 0,
-    shelterActiveUntil: 0,
-    shelterCooldownUntil: 0,
-    lastBirdSpawn: 0,
-    birds: [],
-    lastAICheck: 0,
-    mood: 'Content',
-    asleep: false,
-    lastSave: 0,
-    foodGrowTimer: Date.now(),
-    lastAutoSave: Date.now()
+  // Enemy sprite
+  {
+    const g = this.make.graphics({ add:false });
+    g.fillStyle(0xff7b7b, 1);
+    g.fillRoundedRect(0,0,36,34,8);
+    g.fillStyle(0x2b0b0b,1);
+    g.fillRect(8,22,20,4);
+    g.generateTexture('enemy', 36,34);
+    g.destroy();
+  }
+
+  // Collectible (shiny orb)
+  {
+    const g = this.make.graphics({ add:false });
+    g.fillStyle(0xfff372,1);
+    g.fillCircle(12,12,12);
+    g.fillStyle(0xffffff,0.5);
+    g.fillCircle(8,8,4);
+    g.generateTexture('orb', 24,24);
+    g.destroy();
+  }
+
+  // Platform tile
+  {
+    const g = this.make.graphics({ add:false });
+    g.fillStyle(0x3b5b6e, 1);
+    g.fillRect(0,0,64,24);
+    g.fillStyle(0x23414f,1);
+    g.fillRect(0,0,64,6);
+    g.generateTexture('tile', 64,24);
+    g.destroy();
+  }
+
+  // Background clouds (for parallax)
+  {
+    const g = this.make.graphics({ add:false });
+    g.fillStyle(0xffffff, 0.12);
+    g.fillEllipse(80,40,160,80);
+    g.fillEllipse(20,60,120,60);
+    g.generateTexture('cloud', 160,120);
+    g.destroy();
+  }
+
+  // Particle sparkle
+  {
+    const g = this.make.graphics({ add:false });
+    g.fillStyle(0xffffff, 1);
+    g.fillCircle(4,4,4);
+    g.generateTexture('spark', 8,8);
+    g.destroy();
+  }
+
+  // Create minimal SFX using WebAudio oscillator wrappers (made later in UIScene)
+  this.scene.start('MenuScene');
+};
+
+/* ------------------- Menu Scene ------------------- */
+function MenuScene() { Phaser.Scene.call(this, { key: 'MenuScene' }); }
+MenuScene.prototype = Object.create(Phaser.Scene.prototype);
+MenuScene.prototype.constructor = MenuScene;
+MenuScene.prototype.create = function() {
+  // Big title
+  const title = this.add.text(GAME_WIDTH/2, 120, 'TOONYTIME', { font: '64px "Arial"', fill: '#f0f7ff' }).setOrigin(0.5).setShadow(2,2,'#000',8);
+
+  // Play button
+  const playBtn = this.add.container(GAME_WIDTH/2, 240);
+  const btnBox = this.add.rectangle(0,0,340,72, 0x4477aa).setStrokeStyle(2,0xffffff,0.08).setInteractive({useHandCursor:true});
+  const playText = this.add.text(0,0,'Play — Overworld', { font: '28px Arial', fill:'#fff' }).setOrigin(0.5);
+  playBtn.add([btnBox, playText]);
+
+  btnBox.on('pointerdown', ()=> {
+    this.cameras.main.flash(200,255,255,255);
+    this.scene.start('OverworldScene');
+  });
+
+  // Quick Level (skip to level)
+  const quickBtn = this.add.container(GAME_WIDTH/2, 340);
+  const qBox = this.add.rectangle(0,0,240,52,0x66aa66).setInteractive({useHandCursor:true});
+  const qText = this.add.text(0,0,'Quick Level', { font: '20px Arial', fill:'#072' }).setOrigin(0.5);
+  quickBtn.add([qBox,qText]);
+  qBox.on('pointerdown', ()=> {
+    this.scene.start('LevelScene', { level: 1 });
+  });
+
+  // Credits small
+  this.add.text(GAME_WIDTH - 12, GAME_HEIGHT - 12, 'Demo — no assets • code-only', { font: '12px Arial', fill:'#bcd' }).setOrigin(1,1);
+
+  // Floating particles for vibe
+  const emitter = this.add.particles('spark').createEmitter({
+    x: { min: 0, max: GAME_WIDTH },
+    y: { min: GAME_HEIGHT-120, max: GAME_HEIGHT },
+    lifespan: 2200,
+    speedY: { min: -60, max: -160 },
+    quantity: 1,
+    scale: { start: 1, end: 0 },
+    frequency: 220
+  });
+
+  // Subtle background gradient using graphics
+  const bg = this.add.graphics().fillGradientStyle(0x061025,0x0b1628,0x0b1628,0x061025,1).fillRect(0,0,GAME_WIDTH,GAME_HEIGHT);
+  bg.setDepth(-2);
+  title.setDepth(1);
+};
+
+/* ---------------- Overworld Scene (scrolling map level select) ---------------- */
+function OverworldScene() { Phaser.Scene.call(this, { key: 'OverworldScene' }); }
+OverworldScene.prototype = Object.create(Phaser.Scene.prototype);
+OverworldScene.prototype.constructor = OverworldScene;
+OverworldScene.prototype.create = function() {
+  const width = 2200;
+  const height = GAME_HEIGHT;
+  this.cameras.main.setBackgroundColor('#081125');
+
+  // Parallax layers: distant mountains and clouds
+  for (let i=0;i<6;i++){
+    const cloud = this.add.image(150 + i*300, 80 + (i%2)*20, 'cloud');
+    cloud.setAlpha(0.12 + 0.02*i);
+    cloud.setScale(0.8 + (i%3)*0.2);
+    cloud.setScrollFactor(0.3 + (i%2)*0.05);
+  }
+
+  // Ground snapshot (map path)
+  this.ground = this.add.graphics();
+  this.ground.fillStyle(0x123b3f,1);
+  this.ground.fillRoundedRect(0, GAME_HEIGHT - 110, width, 110, 20);
+
+  // Create nodes (levels) along an x axis
+  this.levelNodes = [];
+  const nodeCount = 6;
+  for (let i=0;i<nodeCount;i++){
+    const x = 120 + i*( (width-240) / (nodeCount-1) );
+    const y = GAME_HEIGHT - 170 - Math.sin(i*1.2)*60;
+    const node = this.add.circle(x,y,26,0x7ad6ff).setStrokeStyle(3,0xffffff,0.12).setInteractive({useHandCursor:true});
+    const label = this.add.text(x,y+46, `Level ${i+1}`, { font: '18px Arial', fill:'#dff' }).setOrigin(0.5);
+    node.levelIndex = i+1;
+    node.on('pointerdown', ()=> {
+      this.cameras.main.shake(120,0.003);
+      this.scene.start('LevelScene', { level: node.levelIndex, startX: 120 + (node.levelIndex-1)*250 });
+    });
+    this.levelNodes.push(node);
+  }
+
+  // Moving "player" icon that can be dragged to pan
+  this.cursor = this.add.triangle(0,0, 0,32, 12,0, 24,32, 0x8effa2).setScale(0.9).setDepth(10);
+  this.cursor.x = this.levelNodes[0].x;
+  this.cursor.y = this.levelNodes[0].y - 60;
+
+  // Camera settings
+  this.cameras.main.setBounds(0,0,width,height);
+  this.physics.world.setBounds(0,0,width,height);
+  this.cameras.main.startFollow(this.cursor, true, 0.08, 0.08);
+
+  // Allow arrow keys or dragging to move cursor
+  this.keys = this.input.keyboard.addKeys({ left: Phaser.Input.Keyboard.KeyCodes.LEFT, right: Phaser.Input.Keyboard.KeyCodes.RIGHT });
+  this.input.on('pointerdown', (p)=> { this.dragging = true; this.lastPointerX = p.x; });
+  this.input.on('pointerup', ()=> { this.dragging = false; });
+
+  // subtle floating characters
+  this.tweens.add({
+    targets: this.cursor,
+    y: `-=${18}`,
+    duration: 1200,
+    yoyo: true,
+    repeat: -1,
+    ease: 'Sine.easeInOut'
+  });
+  // hint text
+  this.add.text(18,18,'Overworld — select a level', { font: '18px Arial', fill:'#dff' }).setScrollFactor(0);
+};
+
+/* update for overworld */
+OverworldScene.prototype.update = function(time, dt) {
+  // dragging pan
+  if (this.dragging && this.input.activePointer.isDown) {
+    const p = this.input.activePointer;
+    const dx = (this.lastPointerX - p.x);
+    this.lastPointerX = p.x;
+    this.cursor.x += dx;
+    // clamp
+    this.cursor.x = Phaser.Math.Clamp(this.cursor.x, 40, 2100);
+  } else {
+    // keyboard nudges
+    if (this.keys.left.isDown) this.cursor.x -= 4;
+    if (this.keys.right.isDown) this.cursor.x += 4;
+  }
+
+  // snap cursor vertically near nearest node
+  let nearest = this.levelNodes.reduce((acc, n) => {
+    const d = Math.abs(n.x - this.cursor.x);
+    return d < acc.d ? { node: n, d } : acc;
+  }, { node: null, d: 99999 }).node;
+  if (nearest) {
+    this.cursor.y = Phaser.Math.Linear(this.cursor.y, nearest.y - 60, 0.06);
+  }
+};
+
+/* ---------------- Level Scene (actual platformer) ---------------- */
+function LevelScene() { Phaser.Scene.call(this, { key: 'LevelScene' }); }
+LevelScene.prototype = Object.create(Phaser.Scene.prototype);
+LevelScene.prototype.constructor = LevelScene;
+
+LevelScene.prototype.init = function(data) {
+  this.levelIndex = data.level || 1;
+  this.startX = data.startX || 120;
+};
+
+LevelScene.prototype.create = function() {
+  // camera boundaries for a longer level
+  const levelWidth = 3200;
+  const levelHeight = GAME_HEIGHT;
+  this.cameras.main.setBounds(0,0,levelWidth,levelHeight);
+  this.physics.world.setBounds(0,0,levelWidth,levelHeight);
+
+  // Background parallax layers
+  const sky = this.add.rectangle(0,0, levelWidth, levelHeight, 0x09203f).setOrigin(0).setScrollFactor(0);
+  const mountains = this.add.tileSprite(0, GAME_HEIGHT - 260, levelWidth, 200, 'cloud').setOrigin(0).setAlpha(0.08).setScrollFactor(0.2);
+  const cloudLayer = this.add.tileSprite(0,80,levelWidth,120,'cloud').setOrigin(0).setAlpha(0.14).setScrollFactor(0.4);
+  const farClouds = this.add.tileSprite(0,40,levelWidth,120,'cloud').setOrigin(0).setAlpha(0.09).setScrollFactor(0.2);
+
+  // Create ground platforms group (static)
+  const platforms = this.physics.add.staticGroup();
+  // create many platform pieces to form a level
+  for (let i=0;i<80;i++){
+    const x = i * 120;
+    let y = GAME_HEIGHT - 64;
+    // random heights to create stairs/gaps
+    if (i%7 === 3) y -= 120;
+    if (i%11 === 7) y -= 200;
+    platforms.create(x, y, 'tile').setOrigin(0,0).refreshBody();
+  }
+  // add some floating platforms
+  for (let i=0;i<18;i++){
+    const x = 300 + i*160;
+    const y = GAME_HEIGHT - 220 - ((i%4)*35);
+    const p = platforms.create(x,y,'tile').setOrigin(0,0).refreshBody();
+    // tiny bounce tween for life
+    this.tweens.add({ targets: p, y: p.y+6, yoyo:true, repeat:-1, duration:2000 + (i*30) });
+  }
+
+  // Player
+  this.player = this.physics.add.sprite(this.startX, GAME_HEIGHT - 200, 'player').setScale(1).setCollideWorldBounds(true);
+  this.player.body.setSize(30,44).setOffset(5,2);
+  this.player.setDepth(5);
+  this.player.maxJumps = 2;
+  this.player.jumps = 0;
+  this.player.canDash = true;
+
+  // Physics collisions
+  this.physics.add.collider(this.player, platforms, (p) => {
+    if (p.body.velocity.y > 0) {
+      p.jumps = 0; // reset double jump
+      p.canDash = true;
+    }
+  });
+
+  // Enemies group (patrolling)
+  this.enemies = this.physics.add.group();
+  for (let i=0;i<10;i++){
+    const ex = 500 + i*240;
+    const ey = GAME_HEIGHT - 130 - (i%3)*36;
+    const e = this.enemies.create(ex, ey, 'enemy');
+    e.setCollideWorldBounds(true);
+    e.setVelocityX( (i%2?40:-40) );
+    e.setBounceX(1);
+  }
+  this.physics.add.collider(this.enemies, platforms);
+  this.physics.add.overlap(this.player, this.enemies, this.onPlayerHitEnemy, null, this);
+
+  // Collectibles
+  this.orbs = this.physics.add.group();
+  for (let i=0;i<20;i++){
+    const ox = 220 + i*160 + (i%3)*26;
+    const oy = GAME_HEIGHT - 200 - (i%4)*40;
+    const orb = this.orbs.create(ox, oy, 'orb');
+    orb.setBounceY(Phaser.Math.FloatBetween(0.2, 0.8));
+  }
+  this.physics.add.overlap(this.player, this.orbs, this.collectOrb, null, this);
+
+  // Particle emitter for jumps/collects
+  this.particles = this.add.particles('spark');
+  this.collectEmitter = this.particles.createEmitter({
+    speed: { min: -120, max: 120 },
+    lifespan: 500,
+    quantity: 8,
+    scale: { start: 0.9, end: 0 },
+    on: false
+  });
+
+  // Camera follow player
+  this.cameras.main.startFollow(this.player, true, 0.12, 0.12, -160, 0);
+  this.cameras.main.setZoom(1.05);
+
+  // HUD via UI Scene (separate layer)
+  this.scene.launch('UIScene', { level: this.levelIndex });
+
+  // Controls
+  this.keys = this.input.keyboard.addKeys({
+    left: Phaser.Input.Keyboard.KeyCodes.LEFT,
+    right: Phaser.Input.Keyboard.KeyCodes.RIGHT,
+    up: Phaser.Input.Keyboard.KeyCodes.UP,
+    z: Phaser.Input.Keyboard.KeyCodes.Z,
+    x: Phaser.Input.Keyboard.KeyCodes.X,
+    space: Phaser.Input.Keyboard.KeyCodes.SPACE
+  });
+
+  // Sound placeholders (simple beep using Oscillator via WebAudio)
+  try {
+    this.audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  } catch(e) { this.audioCtx = null; }
+
+  // level end portal (simple flag)
+  this.flag = this.physics.add.sprite(levelWidth - 160, GAME_HEIGHT - 200, 'player').setTint(0xffd36b).setScale(0.8);
+  this.flag.body.setAllowGravity(false);
+  this.physics.add.overlap(this.player, this.flag, ()=> {
+    this.cameras.main.flash(400,255,255,255);
+    this.scene.stop('UIScene');
+    this.scene.start('OverworldScene');
+  }, null, this);
+
+  // small fx when landing
+  this.lastOnGround = false;
+
+  // polish: small music-like repeating tone (optional)
+  this.muted = false;
+  this.soundOn = true;
+  this.input.keyboard.on('keydown-M', ()=> { this.soundOn = !this.soundOn; });
+
+  // Smoothing: add dust on land
+  this.landParticles = this.particles.createEmitter({
+    x:0,y:0,
+    speedY: { min: -20, max: -80 },
+    speedX: { min: -40, max: 40 },
+    lifespan: 500,
+    quantity: 6,
+    scale: { start: 0.6, end: 0.0 },
+    on: false
+  });
+};
+
+LevelScene.prototype.collectOrb = function(player, orb) {
+  orb.disableBody(true,true);
+  this.collectEmitter.setPosition(orb.x, orb.y);
+  this.collectEmitter.explode(12);
+  // small sound
+  if (this.audioCtx && this.soundOn) playTone(this.audioCtx, 760, 0.07);
+  // update UI
+  const ui = this.scene.get('UIScene');
+  if (ui && ui.updateScore) ui.updateScore(1);
+};
+
+LevelScene.prototype.onPlayerHitEnemy = function(player, enemy) {
+  // simple bounce or respawn mechanic
+  if (player.body.velocity.y > 150) {
+    // jump stomp kill
+    enemy.disableBody(true,true);
+    this.particles.createEmitter({
+      x: enemy.x, y: enemy.y,
+      lifespan: 400, quantity: 12, speed: { min:-200, max:200 }, scale: { start: 1.0, end:0 }, on: false
+    }).explode(12, enemy.x, enemy.y);
+    player.setVelocityY(-420);
+    if (this.audioCtx && this.soundOn) playTone(this.audioCtx, 480, 0.06);
+  } else {
+    // knockback and respawn to start
+    this.cameras.main.shake(260,0.01);
+    player.setTint(0xff6b6b);
+    player.disableBody(true,true);
+    this.time.delayedCall(600, ()=> {
+      player.enableBody(true, this.startX, GAME_HEIGHT - 200, true, true);
+      player.clearTint();
+    });
+    if (this.audioCtx && this.soundOn) playTone(this.audioCtx, 200, 0.12);
+  }
+};
+
+LevelScene.prototype.update = function(time, dt) {
+  const left = this.keys.left.isDown;
+  const right = this.keys.right.isDown;
+  const jumpPress = Phaser.Input.Keyboard.JustDown(this.keys.z) || Phaser.Input.Keyboard.JustDown(this.keys.space);
+  const dashPress = Phaser.Input.Keyboard.JustDown(this.keys.x);
+
+  // horizontal movement
+  if (left) {
+    this.player.setVelocityX(-220);
+    this.player.flipX = true;
+  } else if (right) {
+    this.player.setVelocityX(220);
+    this.player.flipX = false;
+  } else {
+    this.player.setVelocityX(0);
+  }
+
+  // ground check
+  const onGround = this.player.body.blocked.down || this.player.body.touching.down;
+
+  // landed
+  if (onGround && !this.lastOnGround) {
+    this.landParticles.setPosition(this.player.x, this.player.y + 24);
+    this.landParticles.explode(10);
+    if (this.audioCtx && this.soundOn) playTone(this.audioCtx, 280, 0.06);
+  }
+  this.lastOnGround = onGround;
+
+  // jumping / double jump
+  if (jumpPress) {
+    if (onGround || this.player.jumps < this.player.maxJumps) {
+      this.player.setVelocityY(-460);
+      this.player.jumps++;
+      // little particle
+      this.particles.createEmitter({
+        x: this.player.x, y: this.player.y + 20, speed: { min:-80, max:80 }, lifespan: 300, quantity: 8, scale:{start:0.6,end:0}, on: false
+      }).explode(8, this.player.x, this.player.y+14);
+      if (this.audioCtx && this.soundOn) playTone(this.audioCtx, 640, 0.06);
+    }
+  }
+
+  // dash
+  if (dashPress && this.player.canDash) {
+    const dir = this.player.flipX ? -1 : 1;
+    this.player.setVelocityX(700 * dir);
+    this.player.canDash = false;
+    this.time.delayedCall(120, ()=> {
+      // reduce velocity after dash
+      if (this.player) this.player.setVelocityX( (dir>0)?260:-260 );
+    });
+    if (this.audioCtx && this.soundOn) playTone(this.audioCtx, 920, 0.05);
+  }
+
+  // small animation: tilt player when moving
+  this.player.angle = Phaser.Math.Clamp(this.player.body.velocity.x / 10, -8, 8);
+
+  // parallax tile movement
+  this.children.list.filter(c=>c.tilePositionX!==undefined).forEach(layer=>{
+    layer.tilePositionX = this.cameras.main.scrollX * layer.scrollFactorX;
+  });
+};
+
+/* ----------------- UI Scene ---------------- */
+function UIScene() { Phaser.Scene.call(this, { key: 'UIScene', active: false }); }
+UIScene.prototype = Object.create(Phaser.Scene.prototype);
+UIScene.prototype.constructor = UIScene;
+UIScene.prototype.init = function(data) {
+  this.level = data.level || 1;
+};
+UIScene.prototype.create = function() {
+  // score text & lives
+  this.score = 0;
+  this.scoreText = this.add.text(18, 12, `Score: ${this.score}`, { font: '20px Arial', fill:'#eaffff' }).setScrollFactor(0).setDepth(99);
+
+  // level label
+  this.levelText = this.add.text(GAME_WIDTH/2, 12, `Level ${this.level}`, { font: '20px Arial', fill:'#f6f7ff' }).setOrigin(0.5).setScrollFactor(0);
+
+  // pause button (clickable)
+  const pauseBtn = this.add.text(GAME_WIDTH - 18, 12, '❚❚', { font: '20px Arial', fill:'#bcd' }).setOrigin(1,0).setInteractive({useHandCursor:true}).setScrollFactor(0);
+  pauseBtn.on('pointerdown', ()=> {
+    if (this.scene.isPaused('LevelScene')) {
+      this.scene.resume('LevelScene');
+      pauseBtn.setText('❚❚');
+    } else {
+      this.scene.pause('LevelScene');
+      pauseBtn.setText('▶');
+    }
+  });
+
+  // small instruction text
+  this.add.text(18, GAME_HEIGHT - 28, 'Z jump • X dash', { font: '13px Arial', fill:'#bcd' }).setScrollFactor(0);
+
+  // method to let LevelScene update score
+  this.updateScore = (v) => {
+    this.score += v;
+    this.scoreText.setText(`Score: ${this.score}`);
+    // small pop animation
+    this.tweens.add({ targets: this.scoreText, scale: 1.12, yoyo:true, duration:180, ease:'Power1' });
   };
+};
 
-  // UI nodes
-  const hungerBar = document.getElementById('hungerBar');
-  const energyBar = document.getElementById('energyBar');
-  const healthBar = document.getElementById('healthBar');
-  const hungerText = document.getElementById('hungerText');
-  const energyText = document.getElementById('energyText');
-  const happyText = document.getElementById('happyText');
-  const healthText = document.getElementById('healthText');
-  const foodStockEl = document.getElementById('foodStock');
-  const moodEl = document.getElementById('mood');
-  const logEl = document.getElementById('log');
-  const feedBtn = document.getElementById('feedBtn');
-  const shelterBtn = document.getElementById('shelterBtn');
-  const feedCd = document.getElementById('feedCd');
-  const shelterCd = document.getElementById('shelterCd');
+/* ----------------- Utility: simple WebAudio beep ----------------- */
+function playTone(ctx, freq=440, length=0.08) {
+  try {
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'sine';
+    o.frequency.value = freq;
+    o.connect(g);
+    g.connect(ctx.destination);
+    g.gain.setValueAtTime(0.0001, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime + 0.01);
+    o.start();
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + length);
+    o.stop(ctx.currentTime + length + 0.02);
+  } catch(e) { /* ignore */ }
+}
 
-  // helper: clamp
-  const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+/* ----------------- Boot: register scenes and launch ----------------- */
+const game = new Phaser.Game(config);
 
-  // ====== Save / Load ======
-  function saveState(){
-    try{
-      const copy = {
-        hunger: state.hunger,
-        energy: state.energy,
-        happiness: state.happiness,
-        health: state.health,
-        foodStock: state.foodStock,
-        lastFeedAt: state.lastFeedAt,
-        shelterActiveUntil: state.shelterActiveUntil,
-        shelterCooldownUntil: state.shelterCooldownUntil,
-        lastBirdSpawn: state.lastBirdSpawn,
-        mood: state.mood,
-        asleep: state.asleep,
-        foodGrowTimer: state.foodGrowTimer,
-        timestamp: Date.now()
-      };
-      localStorage.setItem(SAVE_KEY, JSON.stringify(copy));
-      state.lastAutoSave = Date.now();
-      uiLog('Saved game');
-    }catch(e){
-      console.warn('Save failed',e);
-    }
-  }
-  function loadState(){
-    try{
-      const raw = localStorage.getItem(SAVE_KEY);
-      if(!raw) return false;
-      const s = JSON.parse(raw);
-      state.hunger = s.hunger ?? state.hunger;
-      state.energy = s.energy ?? state.energy;
-      state.happiness = s.happiness ?? state.happiness;
-      state.health = s.health ?? state.health;
-      state.foodStock = s.foodStock ?? state.foodStock;
-      state.lastFeedAt = s.lastFeedAt ?? state.lastFeedAt;
-      state.shelterActiveUntil = s.shelterActiveUntil ?? state.shelterActiveUntil;
-      state.shelterCooldownUntil = s.shelterCooldownUntil ?? state.shelterCooldownUntil;
-      state.mood = s.mood ?? state.mood;
-      state.asleep = s.asleep ?? state.asleep;
-      state.foodGrowTimer = s.foodGrowTimer ?? state.foodGrowTimer;
-      uiLog('Loaded saved game');
-      return true;
-    }catch(e){ console.warn('Load failed',e); return false; }
-  }
-  // reset
-  document.getElementById('resetBtn').addEventListener('click', ()=>{
-    if(confirm('Reset saved progress?')) {
-      localStorage.removeItem(SAVE_KEY);
-      location.reload();
-    }
-  });
-
-  // ====== UI helpers ======
-  function uiUpdate(){
-    hungerBar.style.width = clamp(state.hunger,0,100) + '%';
-    energyBar.style.width = clamp(state.energy,0,100) + '%';
-    healthBar.style.width = clamp(state.health,0,100) + '%';
-    hungerText.textContent = Math.round(state.hunger);
-    energyText.textContent = Math.round(state.energy);
-    happyText.textContent = Math.round(state.happiness);
-    healthText.textContent = Math.round(state.health);
-    foodStockEl.textContent = state.foodStock;
-    moodEl.textContent = state.mood;
-    // cooldown displays
-    const now = Date.now();
-    feedCd.textContent = (now - state.lastFeedAt < FEED_COOLDOWN) ? `(${Math.ceil((FEED_COOLDOWN - (now-state.lastFeedAt))/1000)}s)` : '';
-    shelterCd.textContent = (now < state.shelterActiveUntil) ? `(active ${(Math.ceil((state.shelterActiveUntil-now)/1000))}s)` : (now < state.shelterCooldownUntil ? `(cd ${(Math.ceil((state.shelterCooldownUntil-now)/1000))}s)` : '');
-  }
-  function uiLog(msg){
-    const time = new Date().toLocaleTimeString();
-    const el = document.createElement('div');
-    el.textContent = `[${time}] ${msg}`;
-    logEl.prepend(el);
-  }
-
-  // ====== Input handling ======
-  const gameWrap = document.getElementById('gameWrap');
-  // mouse
-  canvas.addEventListener('mousemove', (e)=>{
-    const rect = canvas.getBoundingClientRect();
-    pointer.x = (e.clientX - rect.left);
-    pointer.y = (e.clientY - rect.top);
-    pointer.lastX = pointer.x; pointer.lastY = pointer.y;
-  });
-  canvas.addEventListener('mousedown', (e)=>{ pointer.down = true; pointer.lastX = pointer.x; pointer.lastY = pointer.y; });
-  canvas.addEventListener('mouseup', ()=>{ pointer.down = false; });
-
-  // touch
-  canvas.addEventListener('touchstart', (e)=>{
-    const t = e.touches[0];
-    const rect = canvas.getBoundingClientRect();
-    pointer.x = t.clientX - rect.left;
-    pointer.y = t.clientY - rect.top;
-    pointer.down = true;
-  }, {passive:false});
-  canvas.addEventListener('touchmove', (e)=>{
-    e.preventDefault();
-    const t = e.touches[0];
-    const rect = canvas.getBoundingClientRect();
-    pointer.x = t.clientX - rect.left;
-    pointer.y = t.clientY - rect.top;
-  }, {passive:false});
-  canvas.addEventListener('touchend', ()=>{ pointer.down = false; });
-
-  // click birds to scare
-  canvas.addEventListener('click', (e)=>{
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left, y = e.clientY - rect.top;
-    for(let b of state.birds){
-      const d = Math.hypot(b.x - x, b.y - y);
-      if(d < 30){
-        b.scared = true;
-        b.vx += (b.x - x)*0.03;
-        uiLog('You scared a bird!');
-        state.happiness = clamp(state.happiness + 2,0,100);
-      }
-    }
-  });
-
-  // ====== Buttons ======
-  feedBtn.addEventListener('click', ()=>{
-    const now = Date.now();
-    if(now - state.lastFeedAt < FEED_COOLDOWN){ uiLog('Feed is on cooldown'); return; }
-    if(state.foodStock <= 0){ uiLog('No food in stock. Wait for plants to grow.'); return; }
-    state.foodStock--;
-    state.lastFeedAt = now;
-    state.hunger = clamp(state.hunger + 28, 0, 100);
-    state.happiness = clamp(state.happiness + 6,0,100);
-    uiLog('You fed the worm. Yum!');
-  });
-
-  shelterBtn.addEventListener('click', ()=>{
-    const now = Date.now();
-    if(now < state.shelterCooldownUntil){ uiLog('Shelter is on cooldown'); return; }
-    state.shelterActiveUntil = Date.now() + SHELTER_DURATION;
-    state.shelterCooldownUntil = Date.now() + SHELTER_COOLDOWN;
-    uiLog('Shelter active — birds cannot damage your worm for a short time.');
-  });
-
-  // ====== Birds ======
-  function spawnBird() {
-    const side = Math.random() < 0.5 ? -1 : 1;
-    const y = Math.random() * canvas.clientHeight * 0.6 + 40;
-    const x = side === -1 ? -60 : canvas.clientWidth + 60;
-    const speed = 1.2 + Math.random()*1.8;
-    const bird = {
-      x, y,
-      vx: (side=== -1 ? 1 : -1)* speed,
-      vy: 0,
-      targetting:true,
-      scared:false,
-      size: 18 + Math.random()*10,
-      lastDive: 0
-    };
-    state.birds.push(bird);
-  }
-
-  // ====== Simple AI & logic ======
-  function gameLogic(dt){
-    const now = Date.now();
-
-    // Grow food slowly every FOOD_GROW_INTERVAL
-    if(now - state.foodGrowTimer > FOOD_GROW_INTERVAL){
-      state.foodGrowTimer = now;
-      if(Math.random() < 0.9){
-        state.foodStock += 1;
-        uiLog('Some food grew in the garden.');
-      }
-    }
-
-    // Stats decay over time
-    const decayFactor = dt/1000;
-    // hunger decreases over time (lower is bad) BUT our hunger = fullness (0 starving, 100 full) — we decrement fullness
-    state.hunger = clamp(state.hunger - 2.5*decayFactor, 0, 100);
-    // energy decreases slowly; if asleep it recovers
-    if(state.asleep){
-      state.energy = clamp(state.energy + 12*decayFactor, 0, 100);
-      state.happiness = clamp(state.happiness + 2*decayFactor,0,100);
-    } else {
-      state.energy = clamp(state.energy - 3*decayFactor, 0, 100);
-      state.happiness = clamp(state.happiness - 0.25*decayFactor, 0, 100);
-    }
-
-    // starvation damage
-    if(state.hunger < 8){
-      state.health = clamp(state.health - 8*decayFactor, 0, 100);
-      state.happiness = clamp(state.happiness - 1.8*decayFactor,0,100);
-    }
-
-    // low energy => worm falls asleep automatically sometimes
-    if(state.energy < 18 && !state.asleep){
-      state.asleep = true;
-      uiLog('The worm fell asleep to rest.');
-    }
-    // if energy ok, wake up
-    if(state.asleep && state.energy > 80){
-      state.asleep = false;
-      uiLog('The worm woke up.');
-    }
-
-    // happiness affects health slowly
-    if(state.happiness < 18) state.health = clamp(state.health - 1*decayFactor,0,100);
-    if(state.happiness > 70) state.health = clamp(state.health + 0.8*decayFactor,0,100);
-
-    // birds spawning
-    if(now - state.lastBirdSpawn > BIRD_SPAWN_INTERVAL){
-      state.lastBirdSpawn = now;
-      // spawn with random chance; if worm is healthy maybe fewer birds
-      if(Math.random() < 0.9) spawnBird();
-    }
-
-    // Bird AI
-    for(let i = state.birds.length-1; i>=0; i--){
-      const b = state.birds[i];
-      // approach the worm if not scared
-      const head = segments[0];
-      if(b.scared){
-        b.vx *= 0.99;
-        b.vy *= 0.99;
-        b.x += b.vx * dt/16;
-        b.y += b.vy * dt/16;
-      } else {
-        // dive occasionally if close
-        const dx = head.x - b.x, dy = head.y - b.y;
-        const d = Math.hypot(dx, dy);
-        const dirx = dx/d, diry = dy/d;
-        // basic steering
-        b.vx += dirx * 0.04;
-        b.vy += diry * 0.02;
-        const speedLimit = 2.6;
-        const spd = Math.hypot(b.vx,b.vy);
-        if(spd > speedLimit){
-          b.vx *= 0.98; b.vy *= 0.98;
-        }
-        b.x += b.vx * dt/16;
-        b.y += b.vy * dt/16;
-
-        // collision: if bird reaches head and shelter not active
-        if(d < b.size + WORM_BASE_SIZE){
-          if(Date.now() > state.shelterActiveUntil){
-            // hurt
-            state.health = clamp(state.health - 14, 0, 100);
-            state.happiness = clamp(state.happiness - 10,0,100);
-            uiLog('A bird hit your worm! Use Shelter to block attacks.');
-          } else {
-            uiLog('A bird tried to attack but the shelter protected your worm.');
-          }
-          // bird flies off after attack
-          b.scared = true;
-          b.vx = -dirx * 3 + (Math.random()-0.5)*2;
-          b.vy = -diry * 3 + (Math.random()-0.5)*2;
-        }
-      }
-
-      // remove birds offscreen for cleanup
-      if(b.x < -120 || b.x > canvas.clientWidth + 120 || b.y < -120 || b.y > canvas.clientHeight + 120) state.birds.splice(i,1);
-    }
-
-    // Mood
-    if(state.health < 30) state.mood = 'Sick';
-    else if(state.hunger < 18) state.mood = 'Hungry';
-    else if(state.energy < 25) state.mood = 'Sleepy';
-    else if(state.happiness < 25) state.mood = 'Sad';
-    else state.mood = 'Content';
-
-    // auto-heal small over time if everything good
-    if(state.hunger > 70 && state.energy > 40 && state.happiness > 60){
-      state.health = clamp(state.health + 0.2*decayFactor,0,100);
-    }
-  }
-
-  // ====== Worm movement (segments follow the target) ======
-  function updateSegments(dt){
-    const head = segments[0];
-
-    // target selection:
-    let targetX = pointer.x;
-    let targetY = pointer.y;
-
-    // If asleep, worm doesn't follow pointer. It wiggles slightly.
-    if(state.asleep){
-      targetX = segments[0].x + Math.cos(Date.now()/400)*6;
-      targetY = segments[0].y + Math.sin(Date.now()/420)*4;
-    } else {
-      // if pointer far away and mouse not down, worm sometimes wanders
-      if(!pointer.down && Math.random() < 0.005){
-        const w = canvas.clientWidth, h = canvas.clientHeight;
-        targetX = Math.random()*w;
-        targetY = Math.random()*(h*0.6) + h*0.2;
-      }
-    }
-
-    // smooth head follow
-    const dx = targetX - head.x, dy = targetY - head.y;
-    head.angle = Math.atan2(dy,dx);
-    const speed = state.asleep ? 0.5 : 4 + (state.energy/40);
-    head.x += dx * 0.06 * (speed/4);
-    head.y += dy * 0.06 * (speed/4);
-
-    // make segments follow head (reverse kinematics)
-    for(let i=1;i<segments.length;i++){
-      const prev = segments[i-1], seg = segments[i];
-      const dx = prev.x - seg.x, dy = prev.y - seg.y;
-      const ang = Math.atan2(dy,dx);
-      const targetDist = SEG_LEN;
-      const curDist = Math.hypot(dx,dy) || 0.0001;
-      const move = curDist - targetDist;
-      seg.x += Math.cos(ang) * move;
-      seg.y += Math.sin(ang) * move;
-      seg.angle = ang;
-    }
-  }
-
-  // ====== Drawing ======
-  function draw(){
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    // background subtle grid / grass
-    const w = canvas.clientWidth, h = canvas.clientHeight;
-    // ground
-    ctx.save();
-    ctx.fillStyle = 'rgba(20,30,45,0.6)';
-    ctx.fillRect(0, h*0.64, w, h*0.36);
-    ctx.restore();
-
-    // draw birds under worm
-    for(let b of state.birds){
-      drawBird(b);
-    }
-
-    // draw worm segments from tail to head for overlap
-    for(let i = segments.length-1; i>=0; i--){
-      const s = segments[i];
-      const t = i / (segments.length-1);
-      const radius = (WORM_BASE_SIZE * (1.0 - t*0.65)) + 1;
-      drawSegment(s.x, s.y, radius, i);
-    }
-
-    // draw head extras
-    const head = segments[0];
-    // sleepy Z's
-    if(state.asleep){
-      ctx.save();
-      ctx.fillStyle = 'rgba(255,255,255,0.08)';
-      ctx.font = '14px sans-serif';
-      ctx.fillText('💤', head.x - 10, head.y - 30);
-      ctx.restore();
-    } else {
-      // eyes
-      ctx.save();
-      ctx.fillStyle = '#fff';
-      ctx.beginPath();
-      ctx.arc(head.x + Math.cos(head.angle)*6, head.y + Math.sin(head.angle)*6 - 3, 3, 0, Math.PI*2);
-      ctx.fill();
-      ctx.fillStyle = '#000';
-      ctx.beginPath();
-      ctx.arc(head.x + Math.cos(head.angle)*7, head.y + Math.sin(head.angle)*7 - 3, 1.4, 0, Math.PI*2);
-      ctx.fill();
-      ctx.restore();
-    }
-
-    // HUD overlay: shelter indicator
-    if(Date.now() < state.shelterActiveUntil){
-      ctx.save();
-      ctx.fillStyle = 'rgba(50,230,150,0.08)';
-      ctx.fillRect(8,8,160,48);
-      ctx.fillStyle = 'rgba(50,230,150,0.12)';
-      ctx.fillRect(12,12,4,36);
-      ctx.fillStyle = '#aef7d7';
-      ctx.font = '13px sans-serif';
-      ctx.fillText('Shelter active', 28, 32);
-      ctx.restore();
-    }
-  }
-
-  function drawSegment(x,y,r,i){
-    // color gradient
-    const t = i / (segments.length-1);
-    const g1 = lerpColor([35,190,145], [70,130,190], t);
-    ctx.save();
-    ctx.beginPath();
-    ctx.fillStyle = `rgb(${g1[0]},${g1[1]},${g1[2]})`;
-    ctx.shadowColor = 'rgba(0,0,0,0.45)';
-    ctx.shadowBlur = 6;
-    ctx.arc(x,y,r,0,Math.PI*2);
-    ctx.fill();
-    ctx.restore();
-  }
-
-  function drawBird(b){
-    ctx.save();
-    ctx.translate(b.x,b.y);
-    const ang = Math.atan2(b.vy, b.vx);
-    ctx.rotate(ang);
-    // wings (simple)
-    const s = b.size;
-    ctx.beginPath();
-    ctx.moveTo(-s*0.6, -s*0.2);
-    ctx.quadraticCurveTo(-s*1.6, -s*2.2, -s*3.2, -s*0.6);
-    ctx.moveTo(-s*0.6, s*0.2);
-    ctx.quadraticCurveTo(-s*1.6, s*2.2, -s*3.2, s*0.6);
-    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // body
-    ctx.beginPath();
-    ctx.fillStyle = 'rgba(255,255,255,0.95)';
-    ctx.ellipse(0,0,s*0.9,s*0.6,0,0,Math.PI*2);
-    ctx.fill();
-
-    // beak
-    ctx.beginPath();
-    ctx.fillStyle = '#ffc46b';
-    ctx.moveTo(s*0.9, 0);
-    ctx.lineTo(s*1.6, -4);
-    ctx.lineTo(s*1.6, 4);
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.restore();
-  }
-
-  function lerpColor(a,b,t){
-    return [ Math.round(a[0] + (b[0]-a[0])*t),
-             Math.round(a[1] + (b[1]-a[1])*t),
-             Math.round(a[2] + (b[2]-a[2])*t) ];
-  }
-
-  // ====== Main loop ======
-  let last = performance.now();
-  function loop(now){
-    const dt = now - last;
-    last = now;
-
-    // update
-    gameLogic(dt);
-    updateSegments(dt);
-
-    // draw scaled to canvas size
-    resize();
-    draw();
-    uiUpdate();
-
-    // auto save occasionally
-    if(Date.now() - state.lastAutoSave > SAVE_INTERVAL){
-      saveState();
-    }
-
-    requestAnimationFrame(loop);
-  }
-
-  // ====== Initial load ======
-  resize();
-  if(!loadState()) {
-    uiLog('Starting a new game. Tip: Feed and protect your worm!');
-  }
-
-  // set initial pointer center
-  pointer.x = canvas.clientWidth / 2;
-  pointer.y = canvas.clientHeight / 3;
-  segments[0].x = pointer.x; segments[0].y = pointer.y;
-
-  // Start spawn timers
-  state.lastBirdSpawn = Date.now() - 2000;
-  state.foodGrowTimer = Date.now();
-
-  // start loop
-  requestAnimationFrame(loop);
-
-  // Save periodically on page unload
-  window.addEventListener('beforeunload', saveState);
-
-  // expose for debugging (optional)
-  window._wormState = state;
-})();
+/* attach scene constructors to global so config creation above can reference them */
+function registerScenes() {
+  // already declared above; Phaser created instances from keys
+}
 </script>
 </body>
 </html>
