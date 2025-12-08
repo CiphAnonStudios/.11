@@ -1,0 +1,746 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Worm Care Simulator</title>
+<style>
+  :root{
+    --bg:#0f1724;
+    --panel:#0b1220;
+    --accent:#6ee7b7;
+    --muted:#9aa4b2;
+    --danger:#ff6b6b;
+    --glass: rgba(255,255,255,0.04);
+    --glass-2: rgba(255,255,255,0.02);
+  }
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;}
+  body{
+    background: linear-gradient(180deg,#071226 0%, #041027 100%);
+    color:#e6eef6;
+    display:flex;
+    align-items:stretch;
+    gap:18px;
+    padding:18px;
+    box-sizing:border-box;
+  }
+
+  /* Left: canvas area */
+  .game-wrap{
+    flex:1 1 0;
+    min-width:300px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border-radius:12px;
+    padding:12px;
+    display:flex;
+    flex-direction:column;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+    position:relative;
+    overflow:hidden;
+  }
+
+  canvas{width:100%; height:100%; display:block; border-radius:8px; background:
+    radial-gradient(1200px 600px at 10% 10%, rgba(110,231,183,0.03), transparent),
+    linear-gradient(180deg, rgba(6,18,30,1), rgba(3,7,14,1));
+    cursor: none;
+  }
+
+  .hud{
+    position:absolute;
+    left:16px;
+    top:16px;
+    display:flex;
+    gap:10px;
+    align-items:center;
+    z-index:10;
+  }
+  .stat{
+    background:var(--glass);
+    padding:8px 10px;
+    border-radius:10px;
+    min-width:160px;
+    box-shadow: inset 0 -2px 6px rgba(0,0,0,0.35);
+  }
+  .stat h4{font-size:12px;margin:0 0 6px 0;color:var(--muted);}
+  .bar{
+    height:10px;
+    background:var(--glass-2);
+    border-radius:6px;
+    overflow:hidden;
+  }
+  .bar > i{
+    display:block;height:100%;width:50%;background:linear-gradient(90deg,var(--accent),#33d28a);
+    border-radius:6px;
+    transition:width 300ms linear;
+  }
+  .small{
+    font-size:12px;color:var(--muted);
+  }
+
+  /* Right side control panel */
+  .panel{
+    width:320px;
+    max-width:42%;
+    min-width:260px;
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border-radius:12px;
+    padding:14px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    color:#dcecf0;
+  }
+  .panel h2{margin:0;font-size:18px;letter-spacing:0.2px;}
+  .row{display:flex;gap:8px;align-items:center;}
+  button{
+    appearance:none;
+    border:0;
+    padding:10px 12px;
+    border-radius:10px;
+    background:linear-gradient(180deg,#13313b,#0f2a33);
+    color:#e7fbf0;font-weight:600;
+    cursor:pointer;
+    box-shadow: 0 6px 14px rgba(5,10,15,0.5);
+  }
+  button:active{transform:translateY(1px) scale(0.997);}
+  .muted{color:var(--muted);font-size:13px}
+
+  .big-btn{
+    padding:12px 16px;
+    font-size:14px;
+    flex:1;
+  }
+
+  .controls{display:flex;gap:8px;}
+  .stats-list{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .card{background:var(--glass);padding:10px;border-radius:10px;}
+  .log{background:rgba(255,255,255,0.02);padding:8px;border-radius:8px;height:120px;overflow:auto;font-size:13px;color:var(--muted)}
+
+  footer.small{font-size:12px;color:var(--muted);padding-top:6px}
+
+  /* tiny responsive */
+  @media (max-width:900px){
+    body{flex-direction:column;padding:12px;}
+    .panel{width:100%;max-width:100%;}
+  }
+</style>
+</head>
+<body>
+  <div class="game-wrap" id="gameWrap">
+    <div class="hud" aria-hidden="true">
+      <div class="stat" title="Hunger (0 full - 100 starving)">
+        <h4>Hunger</h4>
+        <div class="bar"><i id="hungerBar"></i></div>
+      </div>
+      <div class="stat" title="Energy (sleep recovers energy)">
+        <h4>Energy</h4>
+        <div class="bar"><i id="energyBar"></i></div>
+      </div>
+      <div class="stat" title="Health">
+        <h4>Health</h4>
+        <div class="bar"><i id="healthBar"></i></div>
+      </div>
+    </div>
+
+    <canvas id="c"></canvas>
+  </div>
+
+  <div class="panel" id="panel">
+    <h2>Worm Care Simulator</h2>
+    <p class="muted">Take care of your pet worm — feed it, protect it from birds, and keep it happy. It follows your mouse or finger. Stats save automatically.</p>
+
+    <div class="controls">
+      <button id="feedBtn" class="big-btn">Feed 🍎 <span id="feedCd" class="small muted"></span></button>
+      <button id="shelterBtn" class="big-btn">Shelter 🛡️ <span id="shelterCd" class="small muted"></span></button>
+    </div>
+
+    <div class="row">
+      <div class="card" style="flex:1">
+        <div class="small muted">Food stock</div>
+        <div style="font-weight:700;font-size:20px" id="foodStock">3</div>
+        <div class="small muted">Plant food (auto grows every 60s)</div>
+      </div>
+      <div class="card">
+        <div class="small muted">Worm mood</div>
+        <div id="mood" style="font-weight:700;font-size:18px">Content</div>
+      </div>
+    </div>
+
+    <div class="stats-list">
+      <div class="card"><div class="small muted">Hunger: <span id="hungerText">50</span></div></div>
+      <div class="card"><div class="small muted">Energy: <span id="energyText">50</span></div></div>
+      <div class="card"><div class="small muted">Happiness: <span id="happyText">50</span></div></div>
+      <div class="card"><div class="small muted">Health: <span id="healthText">100</span></div></div>
+    </div>
+
+    <div>
+      <div class="small muted">Action log</div>
+      <div class="log" id="log"></div>
+    </div>
+
+    <div class="row">
+      <button id="resetBtn">Reset Save</button>
+      <div style="flex:1" class="small muted">Autosaves to localStorage (browser)</div>
+    </div>
+
+    <footer class="small">Tip: Click birds to scare them. On mobile: tap to set the worm's target.</footer>
+  </div>
+
+<script>
+/*
+  Worm Care Simulator
+  - Single file demo with canvas rendering + game logic
+  - LocalStorage save under key 'wormSim_save_v1'
+  - Easy to extend: edit constants below
+*/
+
+(() => {
+  // ====== Config ======
+  const SAVE_KEY = 'wormSim_save_v1';
+  const SEGMENTS = 14; // number of worm segments
+  const SEG_LEN = 14; // distance between segments
+  const WORM_BASE_SIZE = 12; // head radius
+  const TICK_MS = 1000/60;
+  const BIRD_SPAWN_INTERVAL = 8000; // ms
+  const FOOD_GROW_INTERVAL = 60000; // ms
+  const FEED_COOLDOWN = 8000;
+  const SHELTER_DURATION = 10000;
+  const SHELTER_COOLDOWN = 20000;
+  const SAVE_INTERVAL = 3000;
+
+  // ====== State ======
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d', { alpha: true });
+
+  // responsive canvas sizing
+  function resize(){ canvas.width = canvas.clientWidth * devicePixelRatio; canvas.height = canvas.clientHeight * devicePixelRatio; ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0); }
+  window.addEventListener('resize', resize);
+
+  // user inputs
+  let pointer = { x: 400, y: 240, down:false, lastX:400, lastY:240 };
+
+  // worm physical segments
+  const segments = [];
+  for(let i=0;i<SEGMENTS;i++){
+    segments.push({ x: 200 - i*SEG_LEN, y: 200, angle:0 });
+  }
+
+  // worm stats
+  let state = {
+    hunger: 60, // 0=starving, 100=well-fed
+    energy: 80, // 0 tired, 100 energetic
+    happiness: 80,
+    health: 100,
+    foodStock: 3,
+    lastFeedAt: 0,
+    shelterActiveUntil: 0,
+    shelterCooldownUntil: 0,
+    lastBirdSpawn: 0,
+    birds: [],
+    lastAICheck: 0,
+    mood: 'Content',
+    asleep: false,
+    lastSave: 0,
+    foodGrowTimer: Date.now(),
+    lastAutoSave: Date.now()
+  };
+
+  // UI nodes
+  const hungerBar = document.getElementById('hungerBar');
+  const energyBar = document.getElementById('energyBar');
+  const healthBar = document.getElementById('healthBar');
+  const hungerText = document.getElementById('hungerText');
+  const energyText = document.getElementById('energyText');
+  const happyText = document.getElementById('happyText');
+  const healthText = document.getElementById('healthText');
+  const foodStockEl = document.getElementById('foodStock');
+  const moodEl = document.getElementById('mood');
+  const logEl = document.getElementById('log');
+  const feedBtn = document.getElementById('feedBtn');
+  const shelterBtn = document.getElementById('shelterBtn');
+  const feedCd = document.getElementById('feedCd');
+  const shelterCd = document.getElementById('shelterCd');
+
+  // helper: clamp
+  const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+
+  // ====== Save / Load ======
+  function saveState(){
+    try{
+      const copy = {
+        hunger: state.hunger,
+        energy: state.energy,
+        happiness: state.happiness,
+        health: state.health,
+        foodStock: state.foodStock,
+        lastFeedAt: state.lastFeedAt,
+        shelterActiveUntil: state.shelterActiveUntil,
+        shelterCooldownUntil: state.shelterCooldownUntil,
+        lastBirdSpawn: state.lastBirdSpawn,
+        mood: state.mood,
+        asleep: state.asleep,
+        foodGrowTimer: state.foodGrowTimer,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(SAVE_KEY, JSON.stringify(copy));
+      state.lastAutoSave = Date.now();
+      uiLog('Saved game');
+    }catch(e){
+      console.warn('Save failed',e);
+    }
+  }
+  function loadState(){
+    try{
+      const raw = localStorage.getItem(SAVE_KEY);
+      if(!raw) return false;
+      const s = JSON.parse(raw);
+      state.hunger = s.hunger ?? state.hunger;
+      state.energy = s.energy ?? state.energy;
+      state.happiness = s.happiness ?? state.happiness;
+      state.health = s.health ?? state.health;
+      state.foodStock = s.foodStock ?? state.foodStock;
+      state.lastFeedAt = s.lastFeedAt ?? state.lastFeedAt;
+      state.shelterActiveUntil = s.shelterActiveUntil ?? state.shelterActiveUntil;
+      state.shelterCooldownUntil = s.shelterCooldownUntil ?? state.shelterCooldownUntil;
+      state.mood = s.mood ?? state.mood;
+      state.asleep = s.asleep ?? state.asleep;
+      state.foodGrowTimer = s.foodGrowTimer ?? state.foodGrowTimer;
+      uiLog('Loaded saved game');
+      return true;
+    }catch(e){ console.warn('Load failed',e); return false; }
+  }
+  // reset
+  document.getElementById('resetBtn').addEventListener('click', ()=>{
+    if(confirm('Reset saved progress?')) {
+      localStorage.removeItem(SAVE_KEY);
+      location.reload();
+    }
+  });
+
+  // ====== UI helpers ======
+  function uiUpdate(){
+    hungerBar.style.width = clamp(state.hunger,0,100) + '%';
+    energyBar.style.width = clamp(state.energy,0,100) + '%';
+    healthBar.style.width = clamp(state.health,0,100) + '%';
+    hungerText.textContent = Math.round(state.hunger);
+    energyText.textContent = Math.round(state.energy);
+    happyText.textContent = Math.round(state.happiness);
+    healthText.textContent = Math.round(state.health);
+    foodStockEl.textContent = state.foodStock;
+    moodEl.textContent = state.mood;
+    // cooldown displays
+    const now = Date.now();
+    feedCd.textContent = (now - state.lastFeedAt < FEED_COOLDOWN) ? `(${Math.ceil((FEED_COOLDOWN - (now-state.lastFeedAt))/1000)}s)` : '';
+    shelterCd.textContent = (now < state.shelterActiveUntil) ? `(active ${(Math.ceil((state.shelterActiveUntil-now)/1000))}s)` : (now < state.shelterCooldownUntil ? `(cd ${(Math.ceil((state.shelterCooldownUntil-now)/1000))}s)` : '');
+  }
+  function uiLog(msg){
+    const time = new Date().toLocaleTimeString();
+    const el = document.createElement('div');
+    el.textContent = `[${time}] ${msg}`;
+    logEl.prepend(el);
+  }
+
+  // ====== Input handling ======
+  const gameWrap = document.getElementById('gameWrap');
+  // mouse
+  canvas.addEventListener('mousemove', (e)=>{
+    const rect = canvas.getBoundingClientRect();
+    pointer.x = (e.clientX - rect.left);
+    pointer.y = (e.clientY - rect.top);
+    pointer.lastX = pointer.x; pointer.lastY = pointer.y;
+  });
+  canvas.addEventListener('mousedown', (e)=>{ pointer.down = true; pointer.lastX = pointer.x; pointer.lastY = pointer.y; });
+  canvas.addEventListener('mouseup', ()=>{ pointer.down = false; });
+
+  // touch
+  canvas.addEventListener('touchstart', (e)=>{
+    const t = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    pointer.x = t.clientX - rect.left;
+    pointer.y = t.clientY - rect.top;
+    pointer.down = true;
+  }, {passive:false});
+  canvas.addEventListener('touchmove', (e)=>{
+    e.preventDefault();
+    const t = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    pointer.x = t.clientX - rect.left;
+    pointer.y = t.clientY - rect.top;
+  }, {passive:false});
+  canvas.addEventListener('touchend', ()=>{ pointer.down = false; });
+
+  // click birds to scare
+  canvas.addEventListener('click', (e)=>{
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left, y = e.clientY - rect.top;
+    for(let b of state.birds){
+      const d = Math.hypot(b.x - x, b.y - y);
+      if(d < 30){
+        b.scared = true;
+        b.vx += (b.x - x)*0.03;
+        uiLog('You scared a bird!');
+        state.happiness = clamp(state.happiness + 2,0,100);
+      }
+    }
+  });
+
+  // ====== Buttons ======
+  feedBtn.addEventListener('click', ()=>{
+    const now = Date.now();
+    if(now - state.lastFeedAt < FEED_COOLDOWN){ uiLog('Feed is on cooldown'); return; }
+    if(state.foodStock <= 0){ uiLog('No food in stock. Wait for plants to grow.'); return; }
+    state.foodStock--;
+    state.lastFeedAt = now;
+    state.hunger = clamp(state.hunger + 28, 0, 100);
+    state.happiness = clamp(state.happiness + 6,0,100);
+    uiLog('You fed the worm. Yum!');
+  });
+
+  shelterBtn.addEventListener('click', ()=>{
+    const now = Date.now();
+    if(now < state.shelterCooldownUntil){ uiLog('Shelter is on cooldown'); return; }
+    state.shelterActiveUntil = Date.now() + SHELTER_DURATION;
+    state.shelterCooldownUntil = Date.now() + SHELTER_COOLDOWN;
+    uiLog('Shelter active — birds cannot damage your worm for a short time.');
+  });
+
+  // ====== Birds ======
+  function spawnBird() {
+    const side = Math.random() < 0.5 ? -1 : 1;
+    const y = Math.random() * canvas.clientHeight * 0.6 + 40;
+    const x = side === -1 ? -60 : canvas.clientWidth + 60;
+    const speed = 1.2 + Math.random()*1.8;
+    const bird = {
+      x, y,
+      vx: (side=== -1 ? 1 : -1)* speed,
+      vy: 0,
+      targetting:true,
+      scared:false,
+      size: 18 + Math.random()*10,
+      lastDive: 0
+    };
+    state.birds.push(bird);
+  }
+
+  // ====== Simple AI & logic ======
+  function gameLogic(dt){
+    const now = Date.now();
+
+    // Grow food slowly every FOOD_GROW_INTERVAL
+    if(now - state.foodGrowTimer > FOOD_GROW_INTERVAL){
+      state.foodGrowTimer = now;
+      if(Math.random() < 0.9){
+        state.foodStock += 1;
+        uiLog('Some food grew in the garden.');
+      }
+    }
+
+    // Stats decay over time
+    const decayFactor = dt/1000;
+    // hunger decreases over time (lower is bad) BUT our hunger = fullness (0 starving, 100 full) — we decrement fullness
+    state.hunger = clamp(state.hunger - 2.5*decayFactor, 0, 100);
+    // energy decreases slowly; if asleep it recovers
+    if(state.asleep){
+      state.energy = clamp(state.energy + 12*decayFactor, 0, 100);
+      state.happiness = clamp(state.happiness + 2*decayFactor,0,100);
+    } else {
+      state.energy = clamp(state.energy - 3*decayFactor, 0, 100);
+      state.happiness = clamp(state.happiness - 0.25*decayFactor, 0, 100);
+    }
+
+    // starvation damage
+    if(state.hunger < 8){
+      state.health = clamp(state.health - 8*decayFactor, 0, 100);
+      state.happiness = clamp(state.happiness - 1.8*decayFactor,0,100);
+    }
+
+    // low energy => worm falls asleep automatically sometimes
+    if(state.energy < 18 && !state.asleep){
+      state.asleep = true;
+      uiLog('The worm fell asleep to rest.');
+    }
+    // if energy ok, wake up
+    if(state.asleep && state.energy > 80){
+      state.asleep = false;
+      uiLog('The worm woke up.');
+    }
+
+    // happiness affects health slowly
+    if(state.happiness < 18) state.health = clamp(state.health - 1*decayFactor,0,100);
+    if(state.happiness > 70) state.health = clamp(state.health + 0.8*decayFactor,0,100);
+
+    // birds spawning
+    if(now - state.lastBirdSpawn > BIRD_SPAWN_INTERVAL){
+      state.lastBirdSpawn = now;
+      // spawn with random chance; if worm is healthy maybe fewer birds
+      if(Math.random() < 0.9) spawnBird();
+    }
+
+    // Bird AI
+    for(let i = state.birds.length-1; i>=0; i--){
+      const b = state.birds[i];
+      // approach the worm if not scared
+      const head = segments[0];
+      if(b.scared){
+        b.vx *= 0.99;
+        b.vy *= 0.99;
+        b.x += b.vx * dt/16;
+        b.y += b.vy * dt/16;
+      } else {
+        // dive occasionally if close
+        const dx = head.x - b.x, dy = head.y - b.y;
+        const d = Math.hypot(dx, dy);
+        const dirx = dx/d, diry = dy/d;
+        // basic steering
+        b.vx += dirx * 0.04;
+        b.vy += diry * 0.02;
+        const speedLimit = 2.6;
+        const spd = Math.hypot(b.vx,b.vy);
+        if(spd > speedLimit){
+          b.vx *= 0.98; b.vy *= 0.98;
+        }
+        b.x += b.vx * dt/16;
+        b.y += b.vy * dt/16;
+
+        // collision: if bird reaches head and shelter not active
+        if(d < b.size + WORM_BASE_SIZE){
+          if(Date.now() > state.shelterActiveUntil){
+            // hurt
+            state.health = clamp(state.health - 14, 0, 100);
+            state.happiness = clamp(state.happiness - 10,0,100);
+            uiLog('A bird hit your worm! Use Shelter to block attacks.');
+          } else {
+            uiLog('A bird tried to attack but the shelter protected your worm.');
+          }
+          // bird flies off after attack
+          b.scared = true;
+          b.vx = -dirx * 3 + (Math.random()-0.5)*2;
+          b.vy = -diry * 3 + (Math.random()-0.5)*2;
+        }
+      }
+
+      // remove birds offscreen for cleanup
+      if(b.x < -120 || b.x > canvas.clientWidth + 120 || b.y < -120 || b.y > canvas.clientHeight + 120) state.birds.splice(i,1);
+    }
+
+    // Mood
+    if(state.health < 30) state.mood = 'Sick';
+    else if(state.hunger < 18) state.mood = 'Hungry';
+    else if(state.energy < 25) state.mood = 'Sleepy';
+    else if(state.happiness < 25) state.mood = 'Sad';
+    else state.mood = 'Content';
+
+    // auto-heal small over time if everything good
+    if(state.hunger > 70 && state.energy > 40 && state.happiness > 60){
+      state.health = clamp(state.health + 0.2*decayFactor,0,100);
+    }
+  }
+
+  // ====== Worm movement (segments follow the target) ======
+  function updateSegments(dt){
+    const head = segments[0];
+
+    // target selection:
+    let targetX = pointer.x;
+    let targetY = pointer.y;
+
+    // If asleep, worm doesn't follow pointer. It wiggles slightly.
+    if(state.asleep){
+      targetX = segments[0].x + Math.cos(Date.now()/400)*6;
+      targetY = segments[0].y + Math.sin(Date.now()/420)*4;
+    } else {
+      // if pointer far away and mouse not down, worm sometimes wanders
+      if(!pointer.down && Math.random() < 0.005){
+        const w = canvas.clientWidth, h = canvas.clientHeight;
+        targetX = Math.random()*w;
+        targetY = Math.random()*(h*0.6) + h*0.2;
+      }
+    }
+
+    // smooth head follow
+    const dx = targetX - head.x, dy = targetY - head.y;
+    head.angle = Math.atan2(dy,dx);
+    const speed = state.asleep ? 0.5 : 4 + (state.energy/40);
+    head.x += dx * 0.06 * (speed/4);
+    head.y += dy * 0.06 * (speed/4);
+
+    // make segments follow head (reverse kinematics)
+    for(let i=1;i<segments.length;i++){
+      const prev = segments[i-1], seg = segments[i];
+      const dx = prev.x - seg.x, dy = prev.y - seg.y;
+      const ang = Math.atan2(dy,dx);
+      const targetDist = SEG_LEN;
+      const curDist = Math.hypot(dx,dy) || 0.0001;
+      const move = curDist - targetDist;
+      seg.x += Math.cos(ang) * move;
+      seg.y += Math.sin(ang) * move;
+      seg.angle = ang;
+    }
+  }
+
+  // ====== Drawing ======
+  function draw(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    // background subtle grid / grass
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    // ground
+    ctx.save();
+    ctx.fillStyle = 'rgba(20,30,45,0.6)';
+    ctx.fillRect(0, h*0.64, w, h*0.36);
+    ctx.restore();
+
+    // draw birds under worm
+    for(let b of state.birds){
+      drawBird(b);
+    }
+
+    // draw worm segments from tail to head for overlap
+    for(let i = segments.length-1; i>=0; i--){
+      const s = segments[i];
+      const t = i / (segments.length-1);
+      const radius = (WORM_BASE_SIZE * (1.0 - t*0.65)) + 1;
+      drawSegment(s.x, s.y, radius, i);
+    }
+
+    // draw head extras
+    const head = segments[0];
+    // sleepy Z's
+    if(state.asleep){
+      ctx.save();
+      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      ctx.font = '14px sans-serif';
+      ctx.fillText('💤', head.x - 10, head.y - 30);
+      ctx.restore();
+    } else {
+      // eyes
+      ctx.save();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(head.x + Math.cos(head.angle)*6, head.y + Math.sin(head.angle)*6 - 3, 3, 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = '#000';
+      ctx.beginPath();
+      ctx.arc(head.x + Math.cos(head.angle)*7, head.y + Math.sin(head.angle)*7 - 3, 1.4, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // HUD overlay: shelter indicator
+    if(Date.now() < state.shelterActiveUntil){
+      ctx.save();
+      ctx.fillStyle = 'rgba(50,230,150,0.08)';
+      ctx.fillRect(8,8,160,48);
+      ctx.fillStyle = 'rgba(50,230,150,0.12)';
+      ctx.fillRect(12,12,4,36);
+      ctx.fillStyle = '#aef7d7';
+      ctx.font = '13px sans-serif';
+      ctx.fillText('Shelter active', 28, 32);
+      ctx.restore();
+    }
+  }
+
+  function drawSegment(x,y,r,i){
+    // color gradient
+    const t = i / (segments.length-1);
+    const g1 = lerpColor([35,190,145], [70,130,190], t);
+    ctx.save();
+    ctx.beginPath();
+    ctx.fillStyle = `rgb(${g1[0]},${g1[1]},${g1[2]})`;
+    ctx.shadowColor = 'rgba(0,0,0,0.45)';
+    ctx.shadowBlur = 6;
+    ctx.arc(x,y,r,0,Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawBird(b){
+    ctx.save();
+    ctx.translate(b.x,b.y);
+    const ang = Math.atan2(b.vy, b.vx);
+    ctx.rotate(ang);
+    // wings (simple)
+    const s = b.size;
+    ctx.beginPath();
+    ctx.moveTo(-s*0.6, -s*0.2);
+    ctx.quadraticCurveTo(-s*1.6, -s*2.2, -s*3.2, -s*0.6);
+    ctx.moveTo(-s*0.6, s*0.2);
+    ctx.quadraticCurveTo(-s*1.6, s*2.2, -s*3.2, s*0.6);
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // body
+    ctx.beginPath();
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.ellipse(0,0,s*0.9,s*0.6,0,0,Math.PI*2);
+    ctx.fill();
+
+    // beak
+    ctx.beginPath();
+    ctx.fillStyle = '#ffc46b';
+    ctx.moveTo(s*0.9, 0);
+    ctx.lineTo(s*1.6, -4);
+    ctx.lineTo(s*1.6, 4);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  function lerpColor(a,b,t){
+    return [ Math.round(a[0] + (b[0]-a[0])*t),
+             Math.round(a[1] + (b[1]-a[1])*t),
+             Math.round(a[2] + (b[2]-a[2])*t) ];
+  }
+
+  // ====== Main loop ======
+  let last = performance.now();
+  function loop(now){
+    const dt = now - last;
+    last = now;
+
+    // update
+    gameLogic(dt);
+    updateSegments(dt);
+
+    // draw scaled to canvas size
+    resize();
+    draw();
+    uiUpdate();
+
+    // auto save occasionally
+    if(Date.now() - state.lastAutoSave > SAVE_INTERVAL){
+      saveState();
+    }
+
+    requestAnimationFrame(loop);
+  }
+
+  // ====== Initial load ======
+  resize();
+  if(!loadState()) {
+    uiLog('Starting a new game. Tip: Feed and protect your worm!');
+  }
+
+  // set initial pointer center
+  pointer.x = canvas.clientWidth / 2;
+  pointer.y = canvas.clientHeight / 3;
+  segments[0].x = pointer.x; segments[0].y = pointer.y;
+
+  // Start spawn timers
+  state.lastBirdSpawn = Date.now() - 2000;
+  state.foodGrowTimer = Date.now();
+
+  // start loop
+  requestAnimationFrame(loop);
+
+  // Save periodically on page unload
+  window.addEventListener('beforeunload', saveState);
+
+  // expose for debugging (optional)
+  window._wormState = state;
+})();
+</script>
+</body>
+</html>
