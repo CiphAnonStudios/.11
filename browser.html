@@ -688,8 +688,6 @@ if (tab.isHomepage) {
             if (mod && e.key.toLowerCase() === 'w') { e.preventDefault(); const active = tabs.find(t=>t.elements.contentEl.classList.contains('active')); if (active) closeTab(active.id); }
         });
 
-        // Initial restore / start
-        document.addEventListener('DOMContentLoaded', ()=> {
             restoreState();
             // ensure homepage quick links propagate clicks to active tab (in case of restored homepage)
             document.addEventListener('click', (e)=>{
@@ -698,7 +696,6 @@ if (tab.isHomepage) {
                     const active = tabs.find(t => t.elements.contentEl.classList.contains('active'));
                     if (active) loadUrlInTab(active.id, el.dataset.url);
                 }
-            });
         });
 
         // Periodically autosave
