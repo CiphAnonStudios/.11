@@ -74,18 +74,36 @@
   }
 }
 
-      /*Crosshair(this Script is the Css for the lock screen)*/
-      #crosshair {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        width: 8px;
-        height: 8px;
-        background: rgba(255, 255, 255, 0.529);
-        border-radius: 50%;
-        transform: translate(-50%, -50%);
-        pointer-events: none;
-      }
+     #crosshair {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 4px;  /* Smaller for precision */
+  height: 4px;
+  background: #00ff00; /* Neon Green is best for visibility in 2026 */
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  
+  /* Outline ensures it never blends into light/white backgrounds */
+  outline: 1px solid rgba(0, 0, 0, 0.8);
+  outline-offset: 1px;
+  
+  /* Subtle glow to make it pop */
+  box-shadow: 0 0 8px rgba(0, 255, 0, 0.6);
+  
+  /* Smooth transition for any state changes */
+  transition: transform 0.1s ease, width 0.1s ease, height 0.1s ease;
+}
+
+/* Optional: Add a class via JS when moving or shooting to show 'bloom' */
+#crosshair.active {
+  width: 12px;
+  height: 12px;
+  background: rgba(0, 255, 0, 0.3);
+  box-shadow: 0 0 15px rgba(0, 255, 0, 0.4);
+}
+
     </style>
   </head>
   <!--Body-->
