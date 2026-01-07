@@ -4,7 +4,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>3D Room with Interior</title>
+    <title>CiphAnon Studios 3D Room</title>
     <style>
       /*Css*/
       /*Body*/
@@ -16,19 +16,64 @@
       canvas {
         display: block;
       }
-      /*Prompt(this script is the Css of the E button that opens and closes the door)*/
-      #prompt {
-        position: fixed;
-        bottom: 20%;
-        left: 50%;
-        transform: translateX(-50%);
-        font-size: 24px;
-        background: rgba(255, 255, 255, 0.386);
-        color: white;
-        padding: 10px;
-        border-radius: 5px;
-        display: none;
-      }
+     #prompt {
+  /* Position & Layout */
+  position: fixed;
+  bottom: 15%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: none; /* Controlled by JS */
+  align-items: center;
+  gap: 12px;
+
+  /* Glassmorphism Effect */
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  
+  /* Text & Border */
+  color: #ffffff;
+  font-family: 'Segoe UI', Roboto, sans-serif;
+  font-weight: 600;
+  font-size: 18px;
+  letter-spacing: 1px;
+  padding: 12px 24px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+
+  /* Animation */
+  animation: fadeInScale 0.2s ease-out forwards;
+}
+
+/* The "E" Key Styling */
+#prompt::before {
+  content: 'E';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: #ffffff;
+  color: #000000;
+  border-radius: 6px;
+  font-weight: 800;
+  box-shadow: 0 4px 0 #b1b1b1; /* Gives it a 3D button look */
+  margin-right: 8px;
+}
+
+/* Subtle "pulse" animation to catch the player's eye */
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+}
+
       /*Crosshair(this Script is the Css for the lock screen)*/
       #crosshair {
         position: fixed;
