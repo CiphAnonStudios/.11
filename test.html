@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Drag to bookmarks</title>
+  <style>
+    .bm-btn {
+      display:inline-block;
+      padding:8px 12px;
+      background:#0078d7;
+      color:#fff;
+      text-decoration:none;
+      border-radius:6px;
+      font-family:system-ui,Segoe UI,Roboto,Arial;
+      cursor:grab;
+    }
+  </style>
+</head>
+<body>
+  <!-- Drag this button to your bookmarks bar -->
+  <a class="bm-btn"
+     href="javascript:(()=>{let p=document.getElementById('bmPanel');if(p){p.style.display=p.style.display==='none'?'block':'none';return;}p=document.createElement('div');p.id='bmPanel';p.style.cssText='position:fixed;top:100px;left:100px;width:400px;height:300px;background:#111;border:2px solid #555;z-index:9999999;resize:both;overflow:hidden;font-family:Arial';let h=document.createElement('div');h.style.cssText='height:30px;background:#222;color:#fff;cursor:move;display:flex;align-items:center;justify-content:space-between;padding:0 6px;user-select:none';h.innerHTML=\"<span>CiphAnon Studios Ai Panel Bookmarklet</span><button id='bmHide' style='background:#444;color:#fff;border:none;cursor:pointer'>✕</button>\";let f=document.createElement('iframe');f.src='https://ciphanonstudios.github.io/.11/aiPage/duckai.html';f.style.cssText='width:100%;height:calc(100% - 30px);border:none;background:#fff';p.appendChild(h);p.appendChild(f);document.body.appendChild(p);document.getElementById('bmHide').onclick=()=>p.style.display='none';let dx=0,dy=0,drag=false;h.onmousedown=e=>{drag=true;dx=e.clientX-p.offsetLeft;dy=e.clientY-p.offsetTop};document.onmousemove=e=>{if(drag){p.style.left=e.clientX-dx+'px';p.style.top=e.clientY-dy+'px'}};document.onmouseup=()=>drag=false})();"
+     title="Drag to bookmarks bar">
+    Drag to bookmarks bar
+  </a>
+</body>
+</html>
